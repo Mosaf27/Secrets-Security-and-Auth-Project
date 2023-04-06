@@ -4,7 +4,8 @@ require("dotenv").config();
 const express = require("express");
 const bodyparser = require("body-parser");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption"); //ADDS MONGOOSE-ENCRYPTION
+const md5 = require("md5"); //ADDS MD5 PACKAGE FOR HASHING PASSWORDS INSTED OF MONGOOSE-ENCRYPTION
+const encrypt = require("mongoose-encryption");
 const ejs = require("ejs");
 
 const app = express();
@@ -21,8 +22,6 @@ const userSchema = new Schema({        //new Schema
     password:String
 });
 
-//ENCRYPTS THE PASSWORD THE NEW ENTERS WHILE REGISTERING UISNG MONGOOSE-ENCRYPTION
-userSchema.plugin(encrypt,{secret:process.env.SECRET,encryptedFields:["password"]});  //encrypt plugin for schema should be specified before mongoose.model
 
 const User = mongoose.model("user", userSchema);  //new model
 
@@ -48,7 +47,7 @@ app.get("/register", (req, res)=>{
 app.post("/register",(req, res)=>{
 
     const newUser = req.body.username;
-    const newPassword = req.body.password;
+    const newPassword = md5(req.body.password); //USING MD5 HASHES PASSWORD WHILE A NEW USER REGISTERS
 
     const user = new User({
         email:newUser,
@@ -67,8 +66,9 @@ app.post("/register",(req, res)=>{
 app.post("/login", async (req, res)=>{      //async function used which is better then .then and catch
 
 const loginUser = req.body.username;               //email user enters in login page
-const loginpassword = req.body.password;           //password user enters in login page
-
+const loginpassword = md5(req.body.password); //WHEN NEW USER TRIES TO LOGIN IT HASHES THE PASSWORD AND 
+                                             //AND CHECKS WHETHER THE PREVIOUSLY HASHED PASSWORD 
+                                             //MACTHES THIS HASHED PASSWORD
 try {                                               //using a try and catch instead of previouly used .then and .catch
     const check = await User.findOne({email:loginUser});   //await means to wait until user with email is found then execute below code
     if(check.password === loginpassword){                 //check the user entered password with the password in userDB
