@@ -4,8 +4,7 @@ require("dotenv").config();
 const express = require("express");
 const bodyparser = require("body-parser");
 const mongoose = require("mongoose");
-const md5 = require("md5"); //ADDS MD5 PACKAGE FOR HASHING PASSWORDS INSTED OF MONGOOSE-ENCRYPTION
-const encrypt = require("mongoose-encryption");
+const bcrypt = require("bcrypt"); //USE BCRYPT INSTEAD OF MD5 FOR SALTING AND HASHING
 const ejs = require("ejs");
 
 const app = express();
@@ -42,16 +41,19 @@ app.get("/register", (req, res)=>{
     res.render("register");
 });
 
+const saltRounds = 10; // BCRYPT SALTING PASSWORD FOR 10 ROUNDS
 
 // post to the register route
 app.post("/register",(req, res)=>{
 
     const newUser = req.body.username;
-    const newPassword = md5(req.body.password); //USING MD5 HASHES PASSWORD WHILE A NEW USER REGISTERS
+
+    //BCRYPT
+    const hash = bcrypt.hashSync(req.body.password, saltRounds); //HASHES THE PASSWORD THAT USER ENTERS WITH SALTROUNDS
 
     const user = new User({
         email:newUser,
-        password:newPassword
+        password:hash
     });
     
     user.save().then(()=>{
@@ -59,25 +61,31 @@ app.post("/register",(req, res)=>{
     }).catch((err)=>{
         console.log(err);
     });
+    
 
+    
 });
 
 //post to the login route
-app.post("/login", async (req, res)=>{      //async function used which is better then .then and catch
+app.post("/login", (req, res)=>{      
+    
+    const loginUser = req.body.username;               //email user enters in login page
+    const loginpassword = req.body.password;           //password user enters in login page
 
-const loginUser = req.body.username;               //email user enters in login page
-const loginpassword = md5(req.body.password); //WHEN NEW USER TRIES TO LOGIN IT HASHES THE PASSWORD AND 
-                                             //AND CHECKS WHETHER THE PREVIOUSLY HASHED PASSWORD 
-                                             //MACTHES THIS HASHED PASSWORD
-try {                                               //using a try and catch instead of previouly used .then and .catch
-    const check = await User.findOne({email:loginUser});   //await means to wait until user with email is found then execute below code
-    if(check.password === loginpassword){                 //check the user entered password with the password in userDB
-        res.render("secrets");                          // if password matches then render  secrets page
-    }
-} catch (error) {
-    res.render(error);
-}
-   
+    User.findOne({email:loginUser}).then((founduser)=>{     //finds one user inside user database whose email 
+        if(founduser){                                      //matches user entered email in login page
+
+            if(bcrypt.compareSync(loginpassword, founduser.password)){ //if user is found BCRYPT
+                res.render("secrets");                  //compare user entered password with hashed password     
+            }                                           //inside database if they match render secrets page 
+        }                                                           
+             
+    }).catch((err)=>{
+        console.log(err);
+    });
+    
+      
+                        
 });
 
 app.listen(3000, ()=>{
