@@ -36,7 +36,8 @@ const { Schema } = mongoose; //default schema for mongoose
 const userSchema = new Schema({        //new Schema
     email:String,
     password:String,
-    googleId:String                 //ADDS  GOOGLEID TO AVIOD SAVING SAME USER TWICE
+    googleId:String,                //ADDS  GOOGLEID TO AVIOD SAVING SAME USER TWICE
+    secret:String                  //ADDS NEW SECRET FIELD FOR SUBMITTING SECRET
 });
 
 userSchema.plugin(passportLocalMongoose); //plugin Passport-Local Mongoose into your User schema
@@ -70,7 +71,6 @@ passport.use(new GoogleStrategy({               //The Google OAuth 2.0 authentic
     callbackURL: "http://localhost:3000/auth/google/secrets"
 },
     function (accessToken, refreshToken, profile, cb) {
-        console.log(profile);
 
         User.findOrCreate({ googleId: profile.id }, function (err, user) { //AFTER AUTH ADD OR FIND THE USER
             return cb(err, user);                                         //WITH THE GOOGLEID
@@ -104,14 +104,20 @@ app.get("/", (req, res)=>{
 
 
 //get secrets route
-app.get("/secrets", (req, res)=>{
-    if(req.isAuthenticated()){    //here if the user is authenticated and saved in session
-                                 // in register route or login route secrets page gets rendered until the browser gets closed
-        res.render('secrets');
-    }else{
-        res.redirect("/login"); //if the browser is closed session and cookies are deleted and login page is rendered
-    }
-})
+app.get("/secrets", async (req, res)=>{
+   try {
+    const findUsersecrets = await User.find({"secret": {$ne: null}},); //FIND ALL THE USERS SECRET FIELD WHOSE
+     if (findUsersecrets) {                                            //VALUE IS NOT EQUAL TO NULL OR NOT EMPTY SECRET FIELD
+        res.render("secrets",{findUsersecrets:findUsersecrets});  //IF FOUND RENDER SECRETS PAGE
+     }                                                          //AND DISPLAY ALL USERS SECRETS IN SECRETS PAGE
+
+
+   } catch (error) {
+    console.log(error);
+   }
+    
+});
+
 
 
 //=============================================================================================================
@@ -192,6 +198,37 @@ app.get("/logout", (req, res, next) => {
 		}
 		res.redirect('/');
 	});
+});
+
+//==============================================================================================================
+
+//GET SUBMIT ROUTE
+app.get("/submit", (req, res)=>{
+    if (req.isAuthenticated) {              //IF USER AUTH RENDER SUBMIT ELSE REDIRECT TO LOGIN
+        res.render("submit");
+    } else {
+        res.redirect("/login");
+    }
+});
+
+//POST TO THE SUBMIT ROUTE
+app.post("/submit", async (req, res)=>{  //ASYNC FUNCTION
+
+    const submitSecret = req.body.secret;  //USER SUBMITTED SECRET
+
+try {
+    const userSecret = await User.findById(req.user.id); //FIND USERS BY ID AND ADD SUBMITTED SECRET 
+    if (userSecret) {                                    
+        userSecret.secret = submitSecret;             //TO THERE SECRET FIELD
+        userSecret.save();                            //SAVE USER AND REDIRECT TO SECRETS
+        res.redirect("/secrets");
+    }
+} catch (error) {
+    console.log(error);
+}
+    
+
+
 });
 
 app.listen(3000, ()=>{
